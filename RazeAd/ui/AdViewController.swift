@@ -36,47 +36,48 @@ import Vision
 class AdViewController: UIViewController {
   @IBOutlet var sceneView: ARSCNView!
   weak var targetView: TargetView!
-
+  
   private var billboard: BillboardContainer?
-
+  
   override func viewDidLoad() {
     super.viewDidLoad()
-
+    
     // Set the view's delegate
     sceneView.delegate = self
-
+    
     // Set the session's delegate
     sceneView.session.delegate = self
 
     // Show statistics such as fps and timing information
     sceneView.showsStatistics = true
-
+    
     // Create a new scene
     let scene = SCNScene()
-
+    
     // Set the scene to the view
     sceneView.scene = scene
-
+    
     // Setup the target view
     let targetView = TargetView(frame: view.bounds)
     view.addSubview(targetView)
     self.targetView = targetView
     targetView.show()
   }
-
+  
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
-
+    
     // Create a session configuration
     let configuration = ARWorldTrackingConfiguration()
-
+    configuration.worldAlignment = .camera
+    
     // Run the view's session
     sceneView.session.run(configuration)
   }
-
+  
   override func viewWillDisappear(_ animated: Bool) {
     super.viewWillDisappear(animated)
-
+    
     // Pause the view's session
     sceneView.session.pause()
   }
@@ -84,37 +85,34 @@ class AdViewController: UIViewController {
 
 // MARK: - ARSCNViewDelegate
 extension AdViewController: ARSCNViewDelegate {
-    
-    func renderer(_ renderer: SCNSceneRenderer,
-                  nodeFor anchor: ARAnchor) -> SCNNode? {
-        // 1
-        guard let billboard = billboard else { return nil }
-        var node: SCNNode? = nil
-        // 2
-        //DispatchQueue.main.sync {
-        switch anchor {
-        // 3
-        case billboard.billboardAnchor:
-            let billboardNode = addBillboardNode()
-            node = billboardNode
-        default:
-            break
-        }
-        //}
-        return node
+  func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
+    guard let billboard = billboard else { return nil }
+    var node: SCNNode? = nil
+    //DispatchQueue.main.sync {
+    switch anchor {
+    case billboard.billboardAnchor:
+      let billboardNode = addBillboardNode()
+      node = billboardNode
+        
+    case (let videoAnchor)
+        where videoAnchor == billboard.videoAnchor:
+        node = addVideoPlayerNode()
+    default:
+      break
     }
     
-    
+    return node
+  }
 }
 
 extension AdViewController: ARSessionDelegate {
   func session(_ session: ARSession, didFailWithError error: Error) {
   }
-
+  
   func sessionWasInterrupted(_ session: ARSession) {
     removeBillboard()
   }
-
+  
   func sessionInterruptionEnded(_ session: ARSession) {
   }
 }
@@ -122,119 +120,196 @@ extension AdViewController: ARSessionDelegate {
 extension AdViewController {
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
     // 1
-    guard let currentFrame = sceneView.session.currentFrame else {
+    if billboard?.hasVideoNode == true {
+        // 2
+        billboard?.billboardNode?.isHidden = false
+        // 3
+        removeVideo()
+        // 4
         return
     }
-    // 2
+    
+    guard let currentFrame = sceneView.session.currentFrame else { return }
+    
     DispatchQueue.global(qos: .background).async {
-        // 3
-        do { // 4
-            let request =
-                VNDetectRectanglesRequest {(request, error) in
-                    // Access the first result in the array,
-                    // after converting to an array
-                    // of VNRectangleObservation
-                    // 5
-                    guard
-                        let results = request.results?
-                            .compactMap({ $0 as? VNRectangleObservation }),
-                        // 6
-                        let result = results.first else {
-                            print ("[Vision] VNRequest produced no result")
-                            return
-                    }
-                    // 1
-                    let coordinates: [matrix_float4x4] = [
-                        result.topLeft,
-                        result.topRight,
-                        result.bottomRight,
-                        result.bottomLeft
-                        ].compactMap {
-                            // 2
-                            guard let hitFeature = currentFrame.hitTest(
-                                $0, types: .featurePoint).first else { return nil }
-                            // 3
-                            return hitFeature.worldTransform
-                    }
-                    // 4
-                    guard coordinates.count == 4 else { return }
-                    // 5
-                    DispatchQueue.main.async {
-                        // 6
-                        self.removeBillboard()
-                        let (topLeft, topRight, bottomRight, bottomLeft) =
-                            (coordinates[0], coordinates[1],
-                             coordinates[2], coordinates[3])
-                        // 7
-                        self.createBillboard(topLeft: topLeft, topRight: topRight,
-                                             bottomRight: bottomRight, bottomLeft: bottomLeft)
-                        for coordinate in coordinates {
-                            // 1
-                            let box = SCNBox(width: 0.01, height: 0.01,
-                                             length: 0.001, chamferRadius: 0.0)
-                            // 2
-                            let node = SCNNode(geometry: box)
-                            // 3
-                            node.transform = SCNMatrix4(coordinate)
-                            // 4
-                            self.sceneView.scene.rootNode.addChildNode(node)
-                        }
-                    }
-                    
-            }
-            // 1
-            let handler = VNImageRequestHandler(
-                cvPixelBuffer: currentFrame.capturedImage)
-            // 2
-            try handler.perform([request])
+      do {
+        let request = VNDetectBarcodesRequest { (request, error) in
+          // Access the first result in the array,
+          // after converting to an array
+          // of VNBarcodeObservation
+          guard let results = request.results?.compactMap({ $0 as? VNBarcodeObservation }), let result = results.first else {
+            print ("[Vision] VNRequest produced no result")
+            return
+          }
+          
+          let coordinates: [matrix_float4x4] = [result.topLeft, result.topRight, result.bottomRight, result.bottomLeft].compactMap {
+            guard let hitFeature = currentFrame.hitTest($0, types: .featurePoint).first else { return nil }
+            return hitFeature.worldTransform
+          }
+          
+          guard coordinates.count == 4 else { return }
+          
+          DispatchQueue.main.async {
+            self.removeBillboard()
             
-        } catch(let error) {
-            print(
-                "An error occurred during rectangle detection: \(error)")
+            let (topLeft, topRight, bottomRight, bottomLeft) = (coordinates[0], coordinates[1], coordinates[2], coordinates[3])
+            
+            self.createBillboard(topLeft: topLeft, topRight: topRight, bottomRight: bottomRight, bottomLeft: bottomLeft)
+            
+            /*
+            for coordinate in coordinates {
+              let box = SCNBox(width: 0.01, height: 0.01, length: 0.001, chamferRadius: 0.0)
+              let node = SCNNode(geometry: box)
+              node.transform = SCNMatrix4(coordinate)
+              self.sceneView.scene.rootNode.addChildNode(node)
+            }
+            */
+          }
         }
+        
+        let handler = VNImageRequestHandler(cvPixelBuffer: currentFrame.capturedImage)
+        try handler.perform([request])
+      } catch(let error) {
+        print("An error occurred during rectangle detection: \(error)")
+      }
     }
   }
 }
 
 private extension AdViewController {
+  func createBillboard(topLeft: matrix_float4x4, topRight: matrix_float4x4, bottomRight: matrix_float4x4, bottomLeft: matrix_float4x4) {
+    let plane = RectangularPlane(topLeft: topLeft, topRight: topRight, bottomLeft: bottomLeft, bottomRight: bottomRight)
+    // 1
+    let rotation =
+        SCNMatrix4MakeRotation(Float.pi / 2.0, 0.0, 0.0, 1.0)
+    // 2
+    let rotatedCenter =
+        plane.center * matrix_float4x4(rotation)
+    let anchor = ARAnchor(transform: rotatedCenter)
+    billboard = BillboardContainer(billboardAnchor: anchor, plane: plane)
+    sceneView.session.add(anchor: anchor)
     
-    func createBillboard(
-        topLeft: matrix_float4x4, topRight: matrix_float4x4,
-        bottomRight: matrix_float4x4, bottomLeft: matrix_float4x4) {
+    print("New billboard created")
+  }
+    
+    func createVideo() {
+        guard let billboard = self.billboard else { return }
+        let rotation =
+            SCNMatrix4MakeRotation(Float.pi / 2.0, 0.0, 0.0, 1.0)
+        let rotatedCenter =
+            billboard.plane.center * matrix_float4x4(rotation)
         // 1
-        let plane = RectangularPlane(
-            topLeft: topLeft, topRight: topRight,
-            bottomLeft: bottomLeft, bottomRight: bottomRight)
+        let anchor = ARAnchor(transform: rotatedCenter)
         // 2
-        let anchor = ARAnchor(transform: plane.center)
-        // 3
-        billboard =
-            BillboardContainer(billboardAnchor: anchor, plane: plane)
-        // 4
         sceneView.session.add(anchor: anchor)
-        print("New billboard created")
+        // 3
+        self.billboard?.videoAnchor = anchor
     }
+  
+  func addBillboardNode() -> SCNNode? {
+    guard let billboard = billboard else { return nil }
     
-    func addBillboardNode() -> SCNNode? {
-        guard let billboard = billboard else { return nil }
+    let rectangle = SCNPlane(width: billboard.plane.width, height: billboard.plane.height)
+    let rectangleNode = SCNNode(geometry: rectangle)
+    self.billboard?.billboardNode = rectangleNode
+    
+    let images = [
+        "logo_1", "logo_2", "logo_3", "logo_4", "logo_5"
+        ].map { UIImage(named: $0)! }
+    setBillboardImages(images)
+    
+    return rectangleNode
+  }
+    
+    func addVideoPlayerNode() -> SCNNode? {
+        guard let billboard = self.billboard else { return nil }
         // 1
-        let rectangle = SCNPlane(width: billboard.plane.width,
-                                 height: billboard.plane.height)
+        let billboardSize = CGSize(width: billboard.plane.width,
+                                   height: billboard.plane.height / 2
+        )
+        let frameSize = CGSize(width: 1024, height: 512)
+        let videoUrl = URL(string:
+            "https://www.rmp-streaming.com/media/bbb-360p.mp4")!
         // 2
-        let rectangleNode = SCNNode(geometry: rectangle)
-        self.billboard?.billboardNode = rectangleNode
-        return rectangleNode
+        let player = AVPlayer(url: videoUrl)
+        let videoPlayerNode = SKVideoNode(avPlayer: player)
+        videoPlayerNode.size = frameSize
+        videoPlayerNode.position = CGPoint(
+            x: frameSize.width / 2,
+            y: frameSize.height / 2
+        )
+        videoPlayerNode.zRotation = CGFloat.pi
+        // 3
+        let spritekitScene = SKScene(size: frameSize)
+        spritekitScene.addChild(videoPlayerNode)
+        // 4
+        let plane = SCNPlane(
+            width: billboardSize.width,
+            height: billboardSize.height
+        )
+        plane.firstMaterial!.isDoubleSided = true
+        plane.firstMaterial!.diffuse.contents = spritekitScene
+        let node = SCNNode(geometry: plane)
+        // 5
+        self.billboard?.videoNode = node
+        // 6
+        self.billboard?.billboardNode?.isHidden = true
+        videoPlayerNode.play()
+        return node
     }
     
-    func removeBillboard() {
-        // 1
-        if let anchor = billboard?.billboardAnchor {
+  
+  func removeBillboard() {
+    if let anchor = billboard?.billboardAnchor {
+      sceneView.session.remove(anchor: anchor)
+      billboard?.billboardNode?.removeFromParentNode()
+      billboard = nil
+    }
+  }
+    
+    func removeVideo() {
+        if let videoAnchor = billboard?.videoAnchor {
+            // 1
+            sceneView.session.remove(anchor: videoAnchor)
             // 2
-            sceneView.session.remove(anchor: anchor)
+            billboard?.videoNode?.removeFromParentNode()
             // 3
-            billboard?.billboardNode?.removeFromParentNode()
-            billboard = nil
+            billboard?.videoAnchor = nil
+            billboard?.videoNode = nil
         }
     }
     
+    
+    func setBillboardImages(_ images: [UIImage]) {
+        // 1
+        let material = SCNMaterial()
+        // 2
+        material.isDoubleSided = true
+        // 3
+        DispatchQueue.main.async {
+            // https://forums.developer.apple.com/thread/89423
+            // A UIView can be assigned to a material
+            // 4
+            // 1
+            let billboardViewController = BillboardViewController(
+                nibName: "BillboardViewController", bundle: nil)
+            billboardViewController.delegate = self
+            // 2
+            billboardViewController.images = images
+            // 3
+            material.diffuse.contents = billboardViewController.view
+            self.billboard?.viewController = billboardViewController
+            // 5
+            self.billboard?.billboardNode?
+                .geometry?.materials = [material]
+        }
+    }
+    
+}
+
+extension AdViewController: BillboardViewDelegate {
+    func billboardViewDidSelectPlayVideo(
+        _ view: BillboardView) {
+        createVideo()
+    }
 }
