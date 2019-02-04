@@ -28,38 +28,12 @@
  * THE SOFTWARE.
  */
 
-import ARKit
-import SceneKit
+import UIKit
 
-protocol VideoPlayerDelegate: class {
-    func didStartPlay()
-    func didEndPlay()
-}
+class ImageCell: UICollectionViewCell {
+  @IBOutlet weak var imageView: UIImageView!
 
-protocol VideoNodeHandler: class {
-    func createNode() -> SCNNode?
-    func removeNode()
-}
-
-class BillboardContainer {
-  var billboardAnchor: ARAnchor
-  var billboardNode: SCNNode?
-  var videoAnchor: ARAnchor?
-  var videoNode: SCNNode?
-  var plane: RectangularPlane
-  var viewController: BillboardViewController?
-    var isFullScreen = false
-    weak var videoNodeHandler: VideoNodeHandler?
-    weak var videoPlayerDelegate: VideoPlayerDelegate?
-
-  var hasBillboardNode: Bool { return billboardNode != nil }
-  var hasVideoNode: Bool { return videoNode != nil }
-
-  init(billboardAnchor: ARAnchor, plane: RectangularPlane) {
-    self.billboardAnchor = billboardAnchor
-    self.plane = plane
-    self.billboardNode = nil
-    self.videoAnchor = nil
-    self.videoNode = nil
+  func show(image: UIImage) {
+    imageView.image = image
   }
 }
