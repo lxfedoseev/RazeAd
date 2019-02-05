@@ -70,7 +70,25 @@ class AdViewController: UIViewController {
     // Create a session configuration
     let configuration = ARWorldTrackingConfiguration()
     configuration.worldAlignment = .camera
-
+    // 1
+    if #available(iOS 11.3, *) {
+//        var triggerImages = ARReferenceImage.referenceImages(
+//            inGroupNamed: "RMK-ARKit-triggers", bundle: nil)
+        var triggerImages: Set<ARReferenceImage> = Set()
+        // 1
+        let image = UIImage(named: "logo_2")!
+        // 2
+        let referenceImage = ARReferenceImage(image.cgImage!,
+                                              orientation: .up, physicalWidth: 0.2)
+        // 3
+        triggerImages.insert(referenceImage)
+        
+        // 2
+        configuration.detectionImages = triggerImages
+    } else {
+        // Fallback on earlier versions
+    }
+    
     // Run the view's session
     sceneView.session.run(configuration)
   }
@@ -117,7 +135,24 @@ extension AdViewController: ARSessionDelegate {
   }
 
   func sessionInterruptionEnded(_ session: ARSession) {
+    
   }
+    
+    // 1
+    func session(_ session: ARSession,
+                 didAdd anchors: [ARAnchor]) {
+        // 2
+        if #available(iOS 11.3, *) {
+        if let imageAnchor = anchors
+            .compactMap({ $0 as? ARImageAnchor }).first {
+            // 3
+            self.createBillboard(center: imageAnchor.transform,
+                                 size: imageAnchor.referenceImage.physicalSize)
+            
+        }
+        }
+    }
+    
 }
 
 extension AdViewController {
@@ -190,6 +225,23 @@ private extension AdViewController {
 
     print("New billboard created")
   }
+    
+    func createBillboard(center: matrix_float4x4, size: CGSize) {
+        // 1
+        let plane = RectangularPlane(center: center, size: size)
+        // 2
+        let rotation =
+            SCNMatrix4MakeRotation(Float.pi / 2, -1.0, 0.0, 0.0)
+        // 3
+        let rotatedCenter =
+            plane.center * matrix_float4x4(rotation)
+        let anchor = ARAnchor(transform: rotatedCenter)
+        billboard = BillboardContainer(
+            billboardAnchor: anchor, plane: plane)
+        billboard?.videoPlayerDelegate = self
+        sceneView.session.add(anchor: anchor)
+        print("New billboard created")
+    }
 
   func addBillboardNode() -> SCNNode? {
     guard let billboard = billboard else { return nil }

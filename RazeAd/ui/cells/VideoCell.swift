@@ -76,6 +76,18 @@ class VideoCell: UICollectionViewCell {
   @IBAction func play() {
     guard let billboard = billboard else { return }
     if billboard.isFullScreen {
+        if isPlaying == false {
+            // 1
+            createVideoPlayerView()
+            playButton.setImage(
+                #imageLiteral(resourceName: "arKit-pause"), for: .normal)
+        } else { // 2
+            stopVideo()
+            playButton.setImage(
+                #imageLiteral(resourceName: "arKit-play"), for: .normal)
+        }
+        // 3
+        isPlaying = !isPlaying
     } else { // 1
         createVideoPlayerAnchor()
         // 2
@@ -85,6 +97,22 @@ class VideoCell: UICollectionViewCell {
     }
     
   }
+    func stopVideo() {
+        player?.pause()
+        
+    }
+    
+    func createVideoPlayerView() {
+        if player == nil {
+            guard let url = URL(string: videoUrl) else { return }
+            player = AVPlayer(url: url)
+            let layer = AVPlayerLayer(player: player)
+            layer.frame = playerContainer.bounds
+            playerContainer.layer.addSublayer(layer)
+        }
+        player?.play()
+    }
+    
 }
 
 extension VideoCell: VideoNodeHandler {

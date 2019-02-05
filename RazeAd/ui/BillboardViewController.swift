@@ -46,9 +46,31 @@ private enum Cell: String {
 class BillboardViewController: UICollectionViewController {
     var sceneView: ARSCNView?
     var billboard: BillboardContainer?
+    weak var mainViewController: AdViewController?
+    weak var mainView: UIView?
     var images: [String] = [
         "logo_1", "logo_2", "logo_3", "logo_4", "logo_5"
     ]
+    
+    // 1
+    let doubleTapGesture = UITapGestureRecognizer()
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // 2
+        doubleTapGesture.numberOfTapsRequired = 2
+        doubleTapGesture.addTarget(
+            self, action: #selector(didDoubleTap))
+        view.addGestureRecognizer(doubleTapGesture)
+    }
+    // 3
+    @objc func didDoubleTap() {
+        guard let billboard = billboard else { return }
+        if billboard.isFullScreen {
+            restoreFromFullScreen()
+        } else {
+            showFullScreen()
+        }
+    }
     
 }
 
@@ -117,4 +139,46 @@ extension BillboardViewController {
     }
     
     
+}
+
+extension BillboardViewController {
+    func showFullScreen() {
+        guard let billboard = billboard else { return }
+        guard billboard.isFullScreen == false else { return }
+        // 1
+        guard let mainViewController =
+            parent as? AdViewController else { return }
+        self.mainViewController = mainViewController
+        mainView = view.superview
+        // 2
+        willMove(toParent: nil)
+        view.removeFromSuperview()
+        removeFromParent()
+// 3
+        willMove(toParent: mainViewController)
+        mainViewController.view.addSubview(view)
+        mainViewController.addChild(self)
+        // 4
+        billboard.isFullScreen = true
+    }
+    
+    func restoreFromFullScreen() {
+        guard let billboard = billboard else { return }
+        guard billboard.isFullScreen == true else { return }
+        guard let mainViewController =
+            mainViewController else { return }
+        guard let mainView = mainView else { return }
+        // 1
+        willMove(toParent: nil)
+        view.removeFromSuperview()
+        removeFromParent()
+        // 2
+        willMove(toParent: mainViewController)
+        mainView.addSubview(view)
+        mainViewController.addChild(self)
+        // 3
+        billboard.isFullScreen = false
+        self.mainViewController = nil
+        self.mainView = nil
+    }
 }
