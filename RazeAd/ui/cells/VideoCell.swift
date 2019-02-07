@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Razeware LLC
+ * Copyright (c) 2018 Razeware LLC
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -34,20 +34,13 @@ import AVFoundation
 import ARKit
 
 class VideoCell: UICollectionViewCell {
-    
-    // 1
-    var isPlaying = false
-    // 2
-    var videoNode: SKVideoNode!
-    var spriteScene: SKScene!
-    // 3
-    var videoUrl: String!
-    // 4
-    var player: AVPlayer?
-    // 5
-    weak var billboard: BillboardContainer?
-    weak var sceneView: ARSCNView?
-    
+  var isPlaying = false
+  var videoNode: SKVideoNode!
+  var spriteScene: SKScene!
+  var videoUrl: String!
+  var player: AVPlayer?
+  weak var billboard: BillboardContainer?
+  weak var sceneView: ARSCNView?
   @IBOutlet weak var playButton: UIButton!
   @IBOutlet weak var playerContainer: UIView!
 
@@ -57,62 +50,51 @@ class VideoCell: UICollectionViewCell {
     self.sceneView = sceneView
     billboard.videoNodeHandler = self
   }
-    
-    func createVideoPlayerAnchor() {
-        guard let billboard = billboard else { return }
-        guard let sceneView = sceneView else { return }
-        // 1
-        let center = billboard.plane.center *
-            matrix_float4x4(SCNMatrix4MakeRotation(
-                Float.pi / 2.0, 0.0, 0.0, 1.0))
-        let anchor = ARAnchor(transform: center)
-        // 2
-        sceneView.session.add(anchor: anchor)
-        // 3
-        billboard.videoAnchor = anchor
+
+  func createVideoPlayerAnchor() {
+    guard let billboard = billboard else { return }
+    guard let sceneView = sceneView else { return }
+
+    let center = billboard.plane.center * matrix_float4x4(SCNMatrix4MakeRotation(Float.pi / 2.0, 0.0, 0.0, 1.0))
+    let anchor = ARAnchor(transform: center)
+    sceneView.session.add(anchor: anchor)
+    billboard.videoAnchor = anchor
+  }
+
+  func createVideoPlayerView() {
+    if player == nil {
+      guard let url = URL(string: videoUrl) else { return }
+      player = AVPlayer(url: url)
+      let layer = AVPlayerLayer(player: player)
+      layer.frame = playerContainer.bounds
+      playerContainer.layer.addSublayer(layer)
     }
-    
+
+    player?.play()
+  }
+
+  func stopVideo() {
+    player?.pause()
+  }
 
   @IBAction func play() {
     guard let billboard = billboard else { return }
+
     if billboard.isFullScreen {
-        if isPlaying == false {
-            // 1
-            createVideoPlayerView()
-            playButton.setImage(
-                #imageLiteral(resourceName: "arKit-pause"), for: .normal)
-        } else { // 2
-            stopVideo()
-            playButton.setImage(
-                #imageLiteral(resourceName: "arKit-play"), for: .normal)
-        }
-        // 3
-        isPlaying = !isPlaying
-    } else { // 1
-        createVideoPlayerAnchor()
-        // 2
-        billboard.videoPlayerDelegate?.didStartPlay()
-        // 3
-        playButton.isEnabled = false
+      if isPlaying == false {
+        createVideoPlayerView()
+        playButton.setImage(#imageLiteral(resourceName: "arKit-pause"), for: .normal)
+      } else {
+        stopVideo()
+        playButton.setImage(#imageLiteral(resourceName: "arKit-play"), for: .normal)
+      }
+      isPlaying = !isPlaying
+    } else {
+      createVideoPlayerAnchor()
+      billboard.videoPlayerDelegate?.didStartPlay()
+      playButton.isEnabled = false
     }
-    
   }
-    func stopVideo() {
-        player?.pause()
-        
-    }
-    
-    func createVideoPlayerView() {
-        if player == nil {
-            guard let url = URL(string: videoUrl) else { return }
-            player = AVPlayer(url: url)
-            let layer = AVPlayerLayer(player: player)
-            layer.frame = playerContainer.bounds
-            playerContainer.layer.addSublayer(layer)
-        }
-        player?.play()
-    }
-    
 }
 
 extension VideoCell: VideoNodeHandler {

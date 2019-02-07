@@ -31,14 +31,14 @@
 import ARKit
 import SceneKit
 
-protocol VideoPlayerDelegate: class {
-    func didStartPlay()
-    func didEndPlay()
+protocol VideoNodeHandler: class {
+  func createNode() -> SCNNode?
+  func removeNode()
 }
 
-protocol VideoNodeHandler: class {
-    func createNode() -> SCNNode?
-    func removeNode()
+protocol VideoPlayerDelegate: class {
+  func didStartPlay()
+  func didEndPlay()
 }
 
 class BillboardContainer {
@@ -47,13 +47,14 @@ class BillboardContainer {
   var videoAnchor: ARAnchor?
   var videoNode: SCNNode?
   var plane: RectangularPlane
+  var isFullScreen = false
   var viewController: BillboardViewController?
-    var isFullScreen = false
-    weak var videoNodeHandler: VideoNodeHandler?
-    weak var videoPlayerDelegate: VideoPlayerDelegate?
 
   var hasBillboardNode: Bool { return billboardNode != nil }
   var hasVideoNode: Bool { return videoNode != nil }
+
+  weak var videoNodeHandler: VideoNodeHandler?
+  weak var videoPlayerDelegate: VideoPlayerDelegate?
 
   init(billboardAnchor: ARAnchor, plane: RectangularPlane) {
     self.billboardAnchor = billboardAnchor
