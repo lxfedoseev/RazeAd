@@ -36,7 +36,7 @@ enum Constants {
 
   static let razeadBeacons: [CLBeaconRegion] = [
     // Change with your own beacon
-    CLBeaconRegion(proximityUUID: UUID(uuidString: "B9407F30-F5F8-466E-AFF9-25556B57FE6D")!, major: 21010, minor: 2255, identifier: "razead-mobile-kiosk")
+    CLBeaconRegion(proximityUUID: UUID(uuidString: "C456E8E4-EA63-47E1-9557-CE4F09607A81")!, major: 16808, minor: 19400, identifier: "razead-mobile-kiosk")
   ]
 
   // REMINDER: Change this to a location near you!!, otherwise geofencing won't work, and beacon monitoring will never be enabled

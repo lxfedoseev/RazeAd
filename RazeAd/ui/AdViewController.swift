@@ -165,6 +165,12 @@ class AdViewController: UIViewController {
             #imageLiteral(resourceName: "arKit-fence-off"), for: .normal)
         // 2
         locationManager.stopMonitoringRegions()
+        // 1
+        locationManager.stopMonitoring(beacons: Constants.razeadBeacons)
+        // 2
+        beaconStatusImage.isHidden = true
+        beaconStatusLabel.isHidden = true
+        stopAutoscanTimer()
     }
 
   }
@@ -219,6 +225,10 @@ extension AdViewController {
       billboard?.videoNodeHandler?.removeNode()
       return
     }
+    // 1
+    }
+    // 2
+    private func scanQRCode() {
 
     guard let currentFrame = sceneView.session.currentFrame else { return }
 
@@ -396,6 +406,7 @@ extension AdViewController {
   }
 
   @objc func didFireTimer(timer: Timer) {
+    scanQRCode()
   }
 }
 
@@ -412,15 +423,50 @@ extension AdViewController: LocationManagerDelegate {
         let title = regionId
         showAlert(with: "geofencing-notification",
                   title: title, message: message)
+        locationManager.startMonitoring(
+            beacons: Constants.razeadBeacons)
     }
     func locationManager(_ locationManager: LocationManager,
                          didExitRegionId regionId: String) {
+        locationManager.stopMonitoring(beacons: Constants.razeadBeacons)
     }
     // MARK: Beacons
     func locationManager(_ locationManager: LocationManager,
                          didRangeBeacon beacon: CLBeacon) {
+        // 1
+        beaconStatusImage.isHidden = false
+        beaconStatusLabel.isHidden = false
+        // 2
+        switch beacon.proximity {
+        case .immediate:
+            beaconStatusImage.image =
+                #imageLiteral(resourceName: "arKit-marker-1")
+        case .near:
+            beaconStatusImage.image =
+                #imageLiteral(resourceName: "arKit-marker-2")
+        case .far:
+            beaconStatusImage.image =
+                #imageLiteral(resourceName: "arKit-marker-3")
+        case .unknown:
+            beaconStatusImage.image =
+                #imageLiteral(resourceName: "arKit-marker-4")
+        }
+        // Start auto scan, but only if the app is in the foreground
+        // and there is no active billboard
+        // 3
+        if UIApplication.shared.applicationState == .active &&
+            (billboard == nil || billboard?.hasBillboardNode == false) {
+            // 4
+            startAutoscanTimer()
+        }
     }
     func locationManager(_ locationManager: LocationManager,
                          didLeaveBeacon beacon: CLBeacon) {
+        // 1
+        stopAutoscanTimer()
+        // 2
+        beaconStatusImage.isHidden = true
+        beaconStatusLabel.isHidden = true
+        
     }
 }

@@ -106,6 +106,32 @@ class LocationManager: NSObject {
 
 // MARK: - Beacons
 extension LocationManager {
+    
+    // 1
+    func startMonitoring(beacons: [CLBeaconRegion]) {
+        for beacon in beacons {
+            startMonitoring(beacon: beacon)
+        }
+    }
+    // 2
+    func startMonitoring(beacon: CLBeaconRegion) {
+        guard CLLocationManager.isRangingAvailable() else {
+            print("[ERROR] Beacon ranging is not available")
+            return
+        }
+        locationManager.startMonitoring(for: beacon)
+    }
+    
+    func stopMonitoring(beacons: [CLBeaconRegion]) {
+        for beacon in beacons {
+            stopMonitoring(beacon: beacon)
+        }
+    }
+    func stopMonitoring(beacon: CLBeaconRegion) {
+        locationManager.stopRangingBeacons(in: beacon)
+        locationManager.stopMonitoring(for: beacon)
+    }
+    
 }
 
 // MARK: - CLLocationManagerDelegate
@@ -150,6 +176,8 @@ extension LocationManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager,
                          didEnterRegion region: CLRegion) {
         if let region = region as? CLBeaconRegion {
+            print("Entered in beacon region: \(region)")
+            locationManager.startRangingBeacons(in: region)
         } else {
             print("Entered in region: \(region)")
             delegate?.locationManager(
@@ -170,6 +198,23 @@ extension LocationManager: CLLocationManagerDelegate {
         print("Geofencing monitoring failed for region " +
             "\(String(describing: region?.identifier))," +
             "error: \(error.localizedDescription)")
+    }
+    
+    // MARK: Beacons
+    // 1
+    func locationManager(_ manager: CLLocationManager,
+                         didRangeBeacons beacons: [CLBeacon],
+                         in region: CLBeaconRegion) {
+        for beacon in beacons {
+            delegate?.locationManager(self, didRangeBeacon: beacon)
+        }
+    }
+    // 2
+    func locationManager(_ manager: CLLocationManager,
+                         rangingBeaconsDidFailFor region: CLBeaconRegion,
+                         withError error: Error) {
+        print("Beacon ranging failed for region \(region) " +
+            "with error: \(error.localizedDescription)")
     }
     
     
